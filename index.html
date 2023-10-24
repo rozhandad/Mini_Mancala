@@ -1,0 +1,67 @@
+
+<HTML>
+<HEAD>
+<TITLE>Mini Mancala</TITLE>
+<SCRIPT Language="JavaScript" type="e49d04f1726f1ddf4582aa15-text/javascript">
+<!-- start page: defines all frames
+
+function GetRoot()
+// returns the directory-spec the current file is in
+{	curHref   = self.location.href;
+	lastSlash = curHref.lastIndexOf( "/");
+	return      curHref.substring( 0, lastSlash + 1);	//	include the last slash
+}
+
+//	needed for the image url (see DisplayCup() in GameControl.html)
+var lite8Root   = GetRoot();
+
+var allFramesLoaded = false;
+
+function SetAllFramesLoaded()
+{
+	allFramesLoaded = true;
+	top.GameControl.Initialise();
+}
+
+// -->
+</SCRIPT>
+<meta name="description" content="mini mancala to play online">
+<meta name="keywords" content="mancala, kalah, wari, educational game">
+<meta name="author" content="www.Rozhdl.ir">
+</HEAD>
+
+<script src="js/rocket-loader.min.js" data-cf-settings="e49d04f1726f1ddf4582aa15-|49"></script><FRAMESET ROWS="92pixels,*" onLoad="SetAllFramesLoaded()" border="0" framespacing="0" frameborder="NO">
+<NOFRAMES> 
+  <center>
+    <font face="Verdana, Arial, Helvetica, sans-serif" size="2">Sorry, but this 
+    page requires <B>Frames</B> and <B>JavaScript</B> support<br>
+    from your browser (for example Netscape 2.0 and up)</font> 
+  </center>
+  <hr noshade size="1">
+  </NOFRAMES>
+<FRAME SRC="TopBar.html" NAME="TopBar" noresize scrolling="no">
+<FRAMESET COLS="148pixels,*" frameborder="NO" border="0" framespacing="0">
+<FRAME SRC="GameControl.html" NAME="GameControl" noresize scrolling="no">
+
+<FRAMESET ROWS="238pixels,*" frameborder="NO" border="0" framespacing="0">
+<FRAMESET COLS="238pixels,*" frameborder="NO" border="0" framespacing="0">
+
+<FRAMESET ROWS="50%,50%" COLS="50%,50%" frameborder="NO" border="0" framespacing="0">
+<FRAME SRC="Dummy.html" NAME="Pit_0_1" noresize scrolling="no">
+<FRAME SRC="Dummy.html" NAME="Pit_0_0" noresize scrolling="no">
+<FRAME SRC="Dummy.html" NAME="Pit_1_0" noresize scrolling="no">
+<FRAME SRC="Dummy.html" NAME="Pit_1_1" noresize scrolling="no">
+</FRAMESET>
+<FRAMESET ROWS="50%,50%" COLS="8pixels,*" frameborder="NO" border="0" framespacing="0">
+<FRAME SRC="Dummy.html" NAME="SideBar_0" noresize scrolling="no">
+<FRAME SRC="SideControl.html" NAME="SideCtrl_0" noresize scrolling="no">
+<FRAME SRC="Dummy.html" NAME="SideBar_1" noresize scrolling="no">
+<FRAME SRC="SideControl.html" NAME="SideCtrl_1" noresize scrolling="no">
+</FRAMESET>
+</FRAMESET>
+<FRAME src="Dummy2.html">
+
+</FRAMESET>
+</FRAMESET>
+</FRAMESET>
+<script src="js/rocket-loader.min.js" data-cf-settings="e49d04f1726f1ddf4582aa15-|49" defer></script></HTML>
