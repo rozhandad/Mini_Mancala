@@ -1,0 +1,820 @@
+<HTML>
+<HEAD>
+<script language="JavaScript" type="c280f2c025fc03705bb98dc7-text/javascript">
+<!--
+<!-- hide this script tag's contents from old browsers
+
+//	----- some generic functions -----
+
+function MyArray( n)
+//	Constructor. Note: indexes start from 0
+{  for (var i = 0; i < n; i++)
+   { this[ i] = 0
+   }
+   this.length = n;
+   return this
+}
+
+function RandomSwitch()
+// returns true or false, on a fifty/fifty basis
+{
+   // unfortunately, the random function is ONLY available on UNIX machines. Ridiculous!
+   // so, fake it.
+   
+   today = new Date();
+   
+   // getTime returns milliseconds since Jan 1,1970.
+   //   return (today.getTime() % 2 == 0) ? false : true;		too much 'false'
+   // getSeconds returns seconds (0 - 59) of the time.
+   return (today.getSeconds() % 2 == 0) ? false : true;		//	better
+
+}  // end of RandomSwitch()
+
+
+// ----- constants -----
+
+LEFT  = 0
+RIGHT = 1
+
+NORTH = 0
+SOUTH = 1
+
+var BackColor		= new MyArray( 2);
+BackColor[ NORTH]	= "#FF9900"			//	yellow
+BackColor[ SOUTH]	= "#00FF00"			//	lite green (from ICC)
+
+var TurnColor		= new MyArray( 2);
+TurnColor[ true]	= "#CC33FF";		//	lite purple (from ICC)
+TurnColor[ false]	= "#663300"			//	lite gray (same as default background)
+
+COMPUTER = 0
+HUMAN    = 1
+
+NEVER         = 0
+OCCASIONALLY  = 1
+ALWAYS        = 2
+
+LOST  = -2
+LOSE  = -1
+DRAW  =  0
+WIN   =  1
+WON   =  2	//	which means, the game is won by the current player on the correct next move
+
+
+// ----- global variables -----
+
+var gGame       = null;
+var gMoveTable  = null;
+
+var gCompMoveTimer = null;
+var gCompMovePending = false;
+var gResetFlag	= false;
+
+//	does this work? Yes.
+//	And does it solve the problem with NS3? No!
+//var setTimeout = top.GameControl.setTimeout;
+//var clearTimeout = top.GameControl.clearTimeout;
+
+//	Let's try to take another approach: let the timer end by itself, while retrying other
+//	tasks depending on it being finished.
+CLEARABLE_TIMER		=	false;			//	so we may easily switch
+
+//	Sorry if all this looks messy; it is! 
+//	It's a first attempt to get things to work in both version 2 and 3 of Netscape Navigator
+
+
+// ----- the database of all game positions -----
+
+function Position( type, afterLeft, afterRight)
+// constructor, for elements of the MoveTable.
+// type (LOST,LOSE,DRAW,WIN,WON) applies to this board position,
+// afterLeft and afterRight are board positions as viewed by opponent, 
+//		after a move of LEFT resp. RIGHT by current player
+{
+   this.type			= type;
+   this.afterMove		= new MyArray( 2);
+   this.afterMove[ LEFT]	= afterLeft;
+   this.afterMove[ RIGHT]	= afterRight;
+   return this;
+}
+
+function MoveTable()
+// constructor
+{
+	this.length	= 49;	//	there are 49 possible positions
+
+	//	we start with [1] for the real table, so it matches the indexes in Chris' files
+
+   this[ "0008"] = new Position( LOST,  null,   null);
+   this[ "0107"] = new Position( LOSE,  null,  "1700");
+   this[ "0206"] = new Position( LOSE,  null,  "1700");
+   this[ "0305"] = new Position( DRAW,  null,  "1610");
+   this[ "0404"] = new Position( LOSE,  null,  "2510");
+   this[ "0503"] = new Position( LOSE,  null,  "2510");
+   this[ "0701"] = new Position( LOSE,  null,  "3320");
+   this[ "1007"] = new Position( WIN,  "0701",  null);
+   this[ "2006"] = new Position( LOSE, "1601",  null);
+   this[ "2060"] = new Position( LOSE, "7001",  null);
+   this[ "3005"] = new Position( LOSE, "1601",  null);
+   this[ "3050"] = new Position( LOSE, "6101",  null);
+   this[ "4004"] = new Position( LOSE, "1502",  null);
+   this[ "4040"] = new Position( LOSE, "5102",  null);
+   this[ "5003"] = new Position( WIN,  "2402",  null);
+   this[ "5030"] = new Position( LOSE, "5102",  null);
+   this[ "6002"] = new Position( WIN,  "2402",  null);
+   this[ "7001"] = new Position( WIN,  "2303",  null);
+   this[ "7010"] = new Position( DRAW, "3203",  null);
+   this[ "1160"] = new Position( DRAW, "6002", "7010");
+   this[ "1205"] = new Position( WIN,  "0503", "1610");
+   this[ "1250"] = new Position( LOSE, "5003", "6110");
+   this[ "1304"] = new Position( WIN,  "0404", "1520");
+   this[ "1340"] = new Position( WIN,  "4004", "5120");
+   this[ "1403"] = new Position( DRAW, "0305", "2420");
+   this[ "1430"] = new Position( WIN,  "3005", "5120");
+   this[ "1502"] = new Position( WIN,  "0206", "2420");
+   this[ "1520"] = new Position( WIN,  "2006", "4220");
+   this[ "1601"] = new Position( WIN,  "0107", "2330");
+   this[ "1610"] = new Position( DRAW, "1007", "3230");
+   this[ "1700"] = new Position( WON,  "0008", "3230");
+   this[ "2222"] = new Position( DRAW, "3203", "3320");
+   this[ "2303"] = new Position( LOSE, "1304", "1430");
+   this[ "2330"] = new Position( WIN,  "4004", "4130");
+   this[ "2402"] = new Position( LOSE, "1205", "2330");
+   this[ "2420"] = new Position( WIN,  "3005", "4130");
+   this[ "2510"] = new Position( WIN,  "2006", "3230");
+   this[ "3104"] = new Position( LOSE, "1502", "1430");
+   this[ "3140"] = new Position( WIN,  "5102", "5030");
+   this[ "3203"] = new Position( DRAW, "1403", "1430");
+   this[ "3230"] = new Position( DRAW, "4103", "4130");
+   this[ "3320"] = new Position( WIN,  "3104", "3140");
+   this[ "4103"] = new Position( DRAW, "1403", "1340");
+   this[ "4130"] = new Position( WIN,  "4103", "4040");
+   this[ "4220"] = new Position( WIN,  "3104", "3140");
+   this[ "5102"] = new Position( WIN,  "2303", "1250");
+   this[ "5120"] = new Position( WIN,  "4103", "3050");
+   this[ "6101"] = new Position( WIN,  "2303", "1160");
+   this[ "6110"] = new Position( WIN,  "3203", "2060");
+
+	this.Test	= MoveTable_Test;		//	tests consistency of the MoveTable
+	
+   return this;
+
+}  // end of MoveTable()
+
+
+function MoveTable_Test()
+//	tests consistency of this MoveTable
+// just testing if every after has an entry in the table
+// and if the types are consistent
+{  var allOK = true;
+
+   for (var i = 1 ; i <= this.length ; i++)
+   {   left = this[ i].afterMove[ LEFT];
+       right = this[ i].afterMove[ RIGHT];
+       if (  (left  != null && this[ left].type  <= LOSE) 
+          || (right != null && this[ right].type <= LOSE)
+          )
+       {   if (this[ i].type <= DRAW)		//	should be WIN or WON
+           {    alert( "Something's wrong in MoveTable: not WIN or WON");
+                allOK = false;
+           }
+       }
+       else 
+       if (  (left  != null && this[ left].type == DRAW) 
+          || (right != null && this[ right].type == DRAW)
+          )
+       {   if (this[ i].type != DRAW)		//	should be DRAW
+           {   alert( "Something's wrong in MoveTable: not DRAW");
+                allOK = false;
+           }
+       }
+       else
+       {   if (this[ i].type >= DRAW)		//	should be LOSE or LOST
+           {    alert( "Something's wrong in MoveTable: not LOSE or LOST");
+                allOK = false;
+           }
+       }
+   }
+   
+   return allOK;
+   
+}	//	end of MoveTable_Test()
+
+
+//	----- now for the real game stuff -----
+
+// ----- Game object and methods -----
+
+function Game()
+// constructor
+{
+   this.currentPlayer  = new Player( HUMAN, "South", this);
+   this.otherPlayer    = new Player( COMPUTER, "North", this);
+
+   // construct players before the board!
+   this.board       = new Board( this);
+
+   this.Reset       = Game_Reset;
+   this.GetPosition = Game_GetPosition;
+   this.SetPosition = Game_SetPosition;
+   this.SwitchTurn  = Game_SwitchTurn;
+   this.Finished    = Game_Finished;
+   this.FinishedIn1 = Game_FinishedIn1;
+   this.Move        = Game_Move;
+   this.DoMove      = Game_DoMove;
+   this.PitToMove   = Game_PitToMove;  // suggests a pit to move
+   
+   this.Display       = Game_Display;
+   this.UpdateControl = Game_UpdateControl;
+   return this;
+
+}  // end of Game()
+
+
+function Game_Reset()
+//	resets this Game
+{
+//	if (gCompMoveTimer != null)			//	pending timer
+	if (gCompMovePending)			//	pending computer move
+	{
+		if (CLEARABLE_TIMER)
+		{	clearTimeout( gCompMoveTimer);	//	stop that		! this doesn't work with Atlas PR2 !
+			gCompMoveTimer = null;
+			gCompMovePending = false;
+		}
+		else
+		{	setTimeout( "gGame.Reset()", 250)		//	try again later
+			gResetFlag = true;
+			return;
+		}
+	}
+
+	sideToStart = document.GameControl.NorthStarts.checked ? NORTH : SOUTH;
+    if (this.currentPlayer.side.kind != sideToStart)
+		this.SwitchTurn();
+    this.currentPlayer.moves = 0;
+    this.otherPlayer.moves = 0;
+    this.SetPosition( "2222");		//	redisplayes game too
+
+	this.board.side[ NORTH].UpdateControl();  
+	this.board.side[ SOUTH].UpdateControl(); 
+    
+    gResetFlag	= false;	//	reset done
+    
+    if (this.currentPlayer.kind == COMPUTER)
+    	TimedComputerMove();
+
+}
+
+function Game_GetPosition()
+// returns the four-digit code (string) representing this Game as viewed from the current player
+{ 
+   return this.currentPlayer.side.GetPosition() + this.otherPlayer.side.GetPosition();
+}
+
+function Game_SetPosition( val)
+//	val is the four-digit code
+{
+    this.currentPlayer.side.SetPosition( val.substring( 0, 2));
+    this.otherPlayer.side.SetPosition( val.substring( 2, 4));
+    this.Display();   // redisplay game
+}
+
+function Game_SwitchTurn()
+//	switches side to play in this Game
+{
+   oldCur = this.currentPlayer;
+   this.currentPlayer = this.otherPlayer;
+   this.otherPlayer = oldCur;
+}
+
+function Game_Finished()
+//	returns true if this Game is lost by current player
+{
+	return gMoveTable[ this.GetPosition()].type == LOST;
+}
+
+function Game_FinishedIn1()
+//	returns true if this Game is won by the current player on the correct next move
+{
+	return gMoveTable[ this.GetPosition()].type == WON;
+}
+
+function Game_Move( pitKind)
+//	prepares the move in this Game for the current player
+{
+	if (pitKind == LEFT || pitKind == RIGHT)
+	{	this.currentPlayer.side.pit[ pitKind].Flash();	        //	before move
+		if (gGame == this)	//	should be!
+			setTimeout( "gGame.DoMove(" + pitKind + ")", 250);		//	wait quarter of a second for the actual move
+		else
+			this.DoMove( pitKind);		//	do it immediately
+	}
+	
+}
+	       
+function Game_DoMove( pitKind)
+//  executes the actual move in this Game for the current player
+{
+	//	Don't make the move before all outstanding loads are completed.
+	//	How do we now that? Not implemented in Netscape 2.0!
+	//	But Atlas' JS has an onLoad event handler for images.
+	
+	if (pitKind == LEFT || pitKind == RIGHT)
+	{
+		newPosition = gMoveTable[ this.GetPosition()].afterMove[ pitKind];
+		if (newPosition == null)
+			alert( "Sorry, that pit is empty. Choose the other one.");
+		else
+		{
+			this.currentPlayer.moves += 1;
+			this.SwitchTurn();	//	because newPosition corresponds to (new) current player
+			this.SetPosition( newPosition);
+   
+			if (this.Finished())
+				AnnounceWin( this.otherPlayer);
+			else
+			{	if (this.currentPlayer.kind == COMPUTER)
+					TimedComputerMove();
+			}
+		}
+	}
+
+}	//	end of Game_DoMove()
+
+
+//	 Method PitToMove() contains the actual 'intelligence' of the computer
+
+var occasions	= 0;
+
+function Game_PitToMove()
+// determines pit to move for current player in this Game
+{  position = this.GetPosition();
+   afterLeft = gMoveTable[ position].afterMove[ LEFT];
+   afterRight = gMoveTable[ position].afterMove[ RIGHT];
+   
+   if (afterLeft == null)
+   {  if (afterRight == null)
+         pit = -1;   // no move available
+      else
+         pit = RIGHT;
+   }
+   else
+   if (afterRight == null)
+      pit = LEFT;
+   else
+   {	//	we have a choice, check user preference on how to play
+		playRandom = document.GameControl.Random.options[ document.GameControl.Random.selectedIndex].value;
+		if (playRandom == OCCASIONALLY)
+		{	if ((++occasions % 3) == 0 && !this.FinishedIn1())
+				playRandom = ALWAYS;		//	1 in 3, but never when the game is won on the correct next move
+			else
+				playRandom = NEVER;
+		}
+		
+		if (playRandom == NEVER)
+		{  // now we choose the pit which results in the smallest type (for opponent after next move)
+			if (gMoveTable[ afterLeft].type < gMoveTable[ afterRight].type) 
+				pit = LEFT;
+			else if (gMoveTable[ afterLeft].type > gMoveTable[ afterRight].type) 
+				pit = RIGHT;
+			else
+				pit = RandomSwitch() ? LEFT : RIGHT;	//	random if it doesn't matter
+		}
+		else
+			pit = RandomSwitch() ? LEFT : RIGHT;
+	}
+	return pit;
+	
+}	//	end of Game_PitToMove()
+
+
+function Game_Display()
+//	displays this Game
+{
+   this.board.Display();
+   this.UpdateControl();
+}
+
+function Game_UpdateControl()
+//	sets GameControl to the status of this Game
+{
+   document.GameControl.Player.value = (this.Finished() ? "<Game over>" : this.currentPlayer.name);
+   document.GameControl.MoveCount.value = this.currentPlayer.moves + 1;
+}
+
+
+// ----- Player object -----
+
+function Player( kind, name, game)
+// constructor
+// for new player of kind (HUMAN, COMPUTER) in game
+{
+   this.kind  = kind;
+   this.name  = name;
+   this.game  = game;
+   this.moves = 0;
+   this.side  = null;			// to be set by new Side()
+   return this;
+
+}  // end of Player()
+
+
+// ----- Board object and methods -----
+
+function Board( game)
+// constructor
+{  this.game = game;
+
+   this.side         = new MyArray( 2);
+   this.side[ NORTH] = new Side( game.otherPlayer, NORTH, this);
+   this.side[ SOUTH] = new Side( game.currentPlayer, SOUTH, this);		//	startup: south moves first
+
+   this.Display  = Board_Display;
+   return this;
+
+}  // end of Board()
+
+
+function Board_Display()
+//	displays this Board
+{
+   this.side[ NORTH].Display();
+   this.side[ SOUTH].Display();
+}
+
+
+// ----- Side object and methods -----
+
+function Side( player, kind, board)
+// constructor
+{
+   this.player      = player;
+   this.player.side = this;
+   this.kind        = kind;
+   this.board       = board;
+   
+   this.signalBar   = top[ "SideBar_" + this.kind];
+   this.control     = top[ "SideCtrl_" + this.kind].document.SideControl;
+   this.control.SideKind.value = this.kind;	//	point back
+
+   this.pit         = new MyArray( 2);
+   this.pit[ LEFT]  = new Pit( 0, LEFT, this);
+   this.pit[ RIGHT] = new Pit( 0, RIGHT, this);
+
+   this.Display       = Side_Display;
+   this.GetPosition   = Side_GetPosition;
+   this.SetPosition   = Side_SetPosition;
+   this.UpdateControl = Side_UpdateControl;
+   
+   return this;
+
+}  // end of Side()
+
+
+function Side_Display()
+//	displays this Side
+{
+	this.pit[ LEFT].Display();
+	this.pit[ RIGHT].Display();
+	
+	this.signalBar.document.bgColor = TurnColor[ this.player == this.board.game.currentPlayer];
+}
+
+function Side_GetPosition()
+//	returns the two digits, denoting the beads of this Side
+{  // force string return
+   val = ("x" + this.pit[ LEFT].beads) + this.pit[ RIGHT].beads;
+   return val.substring( 1, val.length);
+}
+
+function Side_SetPosition( val)
+//	sets the beads of this Side
+//	val is a string of two digits
+{
+    this.pit[ LEFT].beads  = eval( val.substring( 0, 1));
+    this.pit[ RIGHT].beads = eval( val.substring( 1, 2));
+}
+
+function Side_UpdateControl()
+//	sets SideControl to the status of this Side
+//	(the control is a form in SideControl.html)
+{
+	this.control.PlayerName.value     = this.player.name;
+	this.control.ComputerPlay.checked = (this.player.kind == COMPUTER);
+}
+
+
+// ----- Pit object and methods -----
+ 
+function Pit( beads, kind, side)
+// constructor
+{
+   this.beads    = beads;
+   this.kind     = kind;
+   this.side     = side;
+
+   // panel is the frame this pit is displayed in
+   this.panel    = top[ "Pit_" + this.side.kind + "_" + this.kind];
+   
+   this.Display  = Pit_Display;
+   this.Flash    = Pit_Flash;
+   return this;
+
+}  // end of Pit()
+
+
+function Pit_Display()
+//	displays this Pit
+{  current   = (this.side.player == this.side.board.game.currentPlayer);
+   clickable = (current && this.side.player.kind != COMPUTER && this.beads > 0);
+
+  // 'n' variant doesn't have the monkey///////////////////////////////////////////////////////////////////////////////////////////////////
+   pict = "pics/mancala8-" + this.beads + "-" + (current ? "m" : "n") + ".gif";
+
+
+//	this.panel.document.bgColor = BackColor[ this.side.kind];
+   
+//	Netscape 3.0 can't handle document.open()
+//	opening before writing doesn't seem necessary, though. NS 2.02 works fine without it too.
+	
+// this.panel.document.open();
+
+   this.panel.document.write( "<body bgcolor='" + BackColor[ this.side.kind] + "'>");
+   if (clickable)
+   		this.panel.document.write( "<a href='javascript:top.GameControl.HumanMove( " + this.kind + ")'>");
+   this.panel.document.write( "<img src=\"" + top.lite8Root + pict + "\" alt=\"" + this.beads + "\" width=96 height=96>");
+   if (clickable)
+   		this.panel.document.write( "</a>");
+   this.panel.document.write( "</body>");
+   this.panel.document.close();
+}
+
+function Pit_Flash()
+//	flashes the background of this Pit (only sets it, really)
+{
+	this.panel.document.bgColor = TurnColor[ true];
+}
+
+
+//	----- some move supporting functions -----
+
+function TimedComputerMove()
+// wait some seconds, chosen by user, before doing the computer move
+{
+	doItNow = true;
+
+//	if (gCompMoveTimer != null)			//	pending timer
+	if (gCompMovePending)			//	pending timer
+	{	if (CLEARABLE_TIMER)
+			clearTimeout( gCompMoveTimer);	//	stop that			! this doesn't work with Atlas PR2 !
+		else
+			doItNow = false;
+	}
+	if (doItNow)
+		ComputerMove( document.GameControl.CompHold.options[ document.GameControl.CompHold.selectedIndex].value); 
+//	else
+//		setTimeout( "TimedComputerMove()", 250);	//	try it later
+}
+
+var COUNTUNIT		= 1000;		//	count down in seconds
+
+function ComputerMove( hold)
+//	counts down hold (in milliseconds) by resubmitting itself every COUNTUNIT
+// because we want to timeout the computer move, 
+// we must have a global function (as opposed to a method of Game)
+{
+	gCompMoveTimer = null;		//	timer has finished
+	gCompMovePending = false;
+
+	if (!gResetFlag && gGame.currentPlayer.kind == COMPUTER) 	// else forget it
+	{	if (hold <= 0)	//	ok, make the move
+		{
+			gGame.Move( gGame.PitToMove());
+			document.GameControl.Player.value = gGame.currentPlayer.name;
+		}
+		else			//	resubmit
+		{	gCompMoveTimer = setTimeout( "ComputerMove(" + (hold-COUNTUNIT) + ")", COUNTUNIT);
+			if (!CLEARABLE_TIMER)		//	setTimeout appears to return something strange in NS3
+			{	gCompMoveTimer = true;	//	give it a non-null value ourselves
+			}
+			gCompMovePending = true;
+			document.GameControl.Player.value = gGame.currentPlayer.name + " - " + hold/1000;
+		}
+	}
+	else	//	be sure player is correct
+		document.GameControl.Player.value = gGame.currentPlayer.name;
+
+}	//	end of ComputerMove()
+
+
+function HumanMove( pitKind)
+//	user clicked on LEFT or RIGHT pit of current player
+{
+   if (gGame != null)
+   {  if (gGame.currentPlayer.kind == HUMAN)	//	delay the actual move
+          gGame.Move( pitKind);					//	Move does that by itself
+      else
+          alert( "It's not your turn!");
+   }
+   else
+      NotReadyYet();
+
+}	//	end of HumanMove()
+
+
+//	----- initialisation -----
+
+function Initialise()
+//	initialisation routine, called from top-most frameset's onLoad handler.
+//	if necessary frames aren't loaded yet, Initialise() tries again later.
+{
+   if (!top.allFramesLoaded)			//	double check
+   {  setTimeout( "Initialise()", 500);		//	try again in half a second
+   }
+   else      
+   { 
+      gGame = new Game();
+
+      gMoveTable = new MoveTable();
+
+//      gMoveTable.Test();	//	just to be sure
+
+      // to allow other frames to finish loading, before overwritten by Reset(),
+      setTimeout( "gGame.Reset()", 250);	//	reset after just a while
+   }
+
+}   // end of Initialise()
+
+
+//setTimeout( "Initialise()", 1000);				//	Initialise after a second
+//	Now: called from top-most frameset's onLoad handler
+
+//	----- alerts -----
+
+function AnnounceWin( player)
+{
+	alert( "\n" 
+			+ (player.kind == COMPUTER ? "" : "Congratulations, ")
+			+ player.name + " won !"
+			+ "\nThank you for playing."
+		);
+}
+
+function NotReadyYet()
+{
+   alert( "The game is not ready yet.\nPlease wait untill the page is completely loaded.");
+}
+
+//	----- some event handlers -----
+//		be sure to check if the game is ready (gGame != null) in all eventhandlers of the document.
+
+function CompHoldChange()
+//	event handler for 'Hold computer position'
+{
+//	unfortunately, this doesn't work well when both sides are COMPUTER
+//	if (gGame.currentPlayer.kind == COMPUTER)
+//		TimedComputerMove();		//	take new time immediately
+}
+
+function SideNameChange( control)
+//	event handler for PlayerName field of SideControl
+//	control is the control this is called from
+{
+	if (gGame != null)
+	{
+		whichSide             = GetSideForControl( control);
+		whichSide.player.name = control.PlayerName.value;
+		
+		whichSide.board.game.UpdateControl();
+	}
+	else
+		NotReadyYet();
+}
+
+function SidePlayChange( control)
+//	event handler for ComputerPlay check box of SideControl
+//	control is the control this is called from
+{
+	if (gGame != null)
+	{
+		whichSide             = GetSideForControl( control);
+		whichSide.player.kind = (control.ComputerPlay.checked ? COMPUTER : HUMAN);
+			
+		if (whichSide.player == whichSide.board.game.currentPlayer)
+		{
+//			if (gCompMoveTimer != null)			//	pending computer move
+			if (gCompMovePending)			//	pending computer move
+			{	if (CLEARABLE_TIMER)
+				{	clearTimeout( gCompMoveTimer);	//	forget it		! this doesn't work with Atlas PR2 !
+					gCompMoveTimer = null;
+					gCompMovePending = false;
+				}
+			}
+
+//			whichSide.Display();	//	removes or restores clickables
+//			but NS3 cannot handle it from within an event handler, so display later:
+			setTimeout( "gGame.board.side[ " + whichSide.kind + "].Display()", 50);
+	
+			if (whichSide.player.kind == COMPUTER && !whichSide.board.game.Finished())
+				TimedComputerMove();	//	handles pending timer
+		}
+	}
+	else
+		NotReadyYet();
+}
+
+function GetSideForControl( control)
+//	returns the (object) side the control belongs to
+{
+	return gGame.board.side[ control.SideKind.value];
+}
+
+function RedirectNameFocus()
+//	event handler for Player field in GameControl:
+//	redirect to enterable field
+{
+	alert( "\nPlease use the text field on the right\nto change a player's name.");
+	if (gGame != null)
+		SelectTextField( gGame.currentPlayer.side.control.PlayerName);	//	jump to the right
+}
+
+function SelectTextField( field)
+//	helper
+{
+	field.focus();
+	field.select();
+}
+
+//	----- end of the JavaScript code -----
+
+// done hiding from old browsers -->
+
+function MM_openBrWindow(theURL,winName,features) { //v2.0
+  window.open(theURL,winName,features);
+}
+
+function MM_preloadImages() { //v3.0
+  var d=document; if(d.images){ if(!d.MM_p) d.MM_p=new Array();
+    var i,j=d.MM_p.length,a=MM_preloadImages.arguments; for(i=0; i<a.length; i++)
+    if (a[i].indexOf("#")!=0){ d.MM_p[j]=new Image; d.MM_p[j++].src=a[i];}}
+}
+//-->
+</script>
+<style>
+<!--
+.bouton{background: #BE844A;color:#EEEEEE;font: bold 9pt Verdana, Arial, Helvetica ;text-decoration:none;cursor:hand;}
+body {  background-image: url(pics/africanmotif.gif); background-repeat: repeat}
+-->
+</style>
+<title>mancala game control</title>
+<meta name="robots" content="NOFOLLOW,NOINDEX">
+</HEAD>
+<script src="js/rocket-loader.min.js" data-cf-settings="c280f2c025fc03705bb98dc7-|49"></script><BODY bgcolor="#FFFFFF" leftmargin="5" topmargin="5" marginwidth="5" marginheight="5" onLoad="MM_preloadImages('pics/mancala8-0-m.gif','pics/mancala8-0-n.gif','pics/mancala8-1-m.gif','pics/mancala8-1-n.gif','pics/mancala8-2-m.gif','pics/mancala8-2-n.gif','pics/mancala8-3-m.gif','pics/mancala8-3-n.gif','pics/mancala8-4-m.gif','pics/mancala8-4-n.gif','pics/mancala8-5-m.gif','pics/mancala8-5-n.gif','pics/mancala8-6-m.gif','pics/mancala8-6-n.gif','pics/mancala8-7-m.gif','pics/mancala8-7-n.gif','pics/mancala8-8-m.gif','pics/mancala8-8-n.gif')">
+<FORM Name="GameControl">
+
+<b><font face="Verdana, Arial, Helvetica, sans-serif" size="2" color="#663300">Player
+moves</font></b><font color="#CC33FF">
+<INPUT TYPE="text" NAME="MoveCount" Value SIZE="3" onFocus="if (!window.__cfRLUnblockHandlers) return false; this.blur()" class="bouton" data-cf-modified-c280f2c025fc03705bb98dc7->
+<br>
+<br>
+<INPUT TYPE="text" NAME="Player" Value="<Please wait>" SIZE="14" onFocus="if (!window.__cfRLUnblockHandlers) return false; this.blur(); RedirectNameFocus()" class="bouton" data-cf-modified-c280f2c025fc03705bb98dc7->
+</font>
+<hr noshade color="#663300&quot;" size="1">
+<font face="Verdana, Arial, Helvetica, sans-serif" size="1" color="#663300"><b>Random
+play:</b></font>
+<SELECT NAME="Random" SIZE="1" onChange="if (!window.__cfRLUnblockHandlers) return false; " class="bouton" data-cf-modified-c280f2c025fc03705bb98dc7->
+<OPTION Value="2">always
+<OPTION Value="1">occasionally
+<OPTION Value="0" selected>never
+</SELECT>
+<hr noshade color="#663300" size="1">
+<font face="Verdana, Arial, Helvetica, sans-serif" size="1" color="#663300"><b>Hold
+computer position:</b></font>
+<SELECT NAME="CompHold" SIZE="1" onChange="if (!window.__cfRLUnblockHandlers) return false; CompHoldChange()" class="bouton" data-cf-modified-c280f2c025fc03705bb98dc7->
+<OPTION Value="3000" selected>3 seconds
+<OPTION Value="5000">5 seconds
+<OPTION Value="10000">10 seconds
+<OPTION Value="15000">15 seconds
+</SELECT>
+<hr noshade color="#663300" size="1">
+<center>
+<INPUT TYPE="checkbox" Name="NorthStarts" class="bouton">
+<font size="1" face="Verdana, Arial, Helvetica, sans-serif" color="#663300"><b>North
+moves first</b></font>
+<hr noshade color="#663300" size="1">
+<font size="1" face="Verdana, Arial, Helvetica, sans-serif"> </font>
+<br>
+<table width="117" height="17" border="0" cellspacing="0" cellpadding="0">
+<tr>
+<td align="center" valign="middle">
+<input type="button" value="New Game" onClick="if (!window.__cfRLUnblockHandlers) return false; gGame==null ? NotReadyYet() : gGame.Reset()" name="button" class="bouton" data-cf-modified-c280f2c025fc03705bb98dc7->
+<br>
+<input type="button" value="Game rules" name="button" onClick="if (!window.__cfRLUnblockHandlers) return false; MM_openBrWindow('gamerulesmancala.html','MancalaRules','menubar=yes,scrollbars=yes,resizable=yes,width=300,height=300')" class="bouton" data-cf-modified-c280f2c025fc03705bb98dc7->
+</td>
+</tr>
+</table>
+</center>
+</FORM>
+<script src="js/rocket-loader.min.js" data-cf-settings="c280f2c025fc03705bb98dc7-|49" defer></script></BODY>
+</HTML>
